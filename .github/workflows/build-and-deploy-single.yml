@@ -1,0 +1,33 @@
+name: Build and deploy (single)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Run prereqs
+        run: bash infra/scripts/00_prereqs.sh
+
+      - name: Build and push image to ACR
+        run: |
+          bash infra/scripts/10_acr_build_push.sh "${{ secrets.ACR_NAME }}" "quickstart-fastapi" "${{ github.sha }}"
+
+      - name: Deploy to Container Apps
+        run: |
+          bash infra/scripts/20_deploy_containerapp.sh "${{ secrets.AZURE_RESOURCE_GROUP }}" "${{ secrets.ACA_ENV_NAME }}" "${{ secrets.CONTAINERAPP_NAME }}" "${{ secrets.ACR_NAME }}" "${{ secrets.ACR_NAME }}.azurecr.io/quickstart-fastapi:${{ github.sha }}" "${{ secrets.AZURE_LOCATION }}"
