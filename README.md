@@ -23,6 +23,16 @@ samples/
 - Azure CLI (latest) + `containerapp` extension (handled by `00_prepare.sh`)
 - Bash shell (Linux / WSL / macOS recommended)
 
+## Runtime Matrix
+Current supported / planned runtimes (build targeting strategy):
+
+| Language | Runtime | Status  | Notes |
+|----------|---------|---------|-------|
+| Python   | 3.10    | Active  | Docker ARG `PYTHON_VERSION` (default 3.10) |
+| Java     | 11      | Planned | Will be added with Spring Boot sample |
+
+When Java sample is introduced, a similar ARG (`JDK_VERSION=11`) pattern will be used to avoid directory duplication.
+
 ## Quick Start
 
 ### 1. Prepare (Provider & Extension)
