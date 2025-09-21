@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$DIR/shared/00_prepare.sh" "$@"#!/usr/bin/env bash
 set -euo pipefail
 
 # 00_prepare.sh

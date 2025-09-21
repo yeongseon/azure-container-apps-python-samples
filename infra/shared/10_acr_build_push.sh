@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$DIR/shared/10_acr_build_push.sh" "$@"#!/usr/bin/env bash
 set -euo pipefail
 
 # 10_acr_build_push.sh
@@ -31,7 +29,13 @@ FULL_IMAGE="$ACR_NAME.azurecr.io/$IMAGE_NAME:$TAG"
 # Determine script and repo root paths so build works from any CWD
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BUILD_CONTEXT="$REPO_ROOT/samples/quickstart-fastapi"
+
+# Heuristic: if python sample moved under python/, prefer new path; else fallback old
+if [ -d "$REPO_ROOT/python/samples/quickstart-fastapi" ]; then
+  BUILD_CONTEXT="$REPO_ROOT/python/samples/quickstart-fastapi"
+else
+  BUILD_CONTEXT="$REPO_ROOT/samples/quickstart-fastapi"
+fi
 
 echo "==> Building Docker image $FULL_IMAGE from context $BUILD_CONTEXT"
 

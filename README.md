@@ -1,120 +1,185 @@
-# Azure Container Apps Python Sample
+# Azure Container Apps Multi‑Language Samples (Python & Java)
 
-This repository contains a minimal FastAPI application and helper scripts to build and push the image to Azure Container Registry (ACR) and deploy it to Azure Container Apps (ACA) using a safe two‑phase pattern (placeholder image first, then switch to the real image after Managed Identity and AcrPull role assignment propagate).
+This repository provides a hardened deployment pattern to Azure Container Apps (ACA) using Azure Container Registry (ACR), a system‑assigned Managed Identity, and a two‑phase rollout (public placeholder image first, then switch to the private ACR image after AcrPull role propagation). It currently includes:
 
-## Structure
+* Python FastAPI sample (active)
+* Java Spring Boot sample (initial scaffold)
+
+The infra scripting is shared; language samples live under language‑specific folders for future expansion (.NET, Node, etc.) without duplicating deployment logic.
+
+## Repository Structure
 
 ```
 infra/
-	scripts/
+	shared/                     # Canonical scripts (called by wrappers)
 		00_prepare.sh             # Install extension / register provider
-		01_create_infra.sh        # Create RG, ACR, ACA environment (env vars)
-		10_acr_build_push.sh      # Build & push image (local + remote fallback)
-		20_deploy_containerapp.sh # Deploy container app (MI + AcrPull + update)
-samples/
-	quickstart-fastapi/
-		app/main.py               # FastAPI sample endpoints
-		Dockerfile
-		requirements.txt
+		01_create_infra.sh        # Create RG, ACR, ACA environment
+		10_acr_build_push.sh      # Build & push image (local first, remote fallback)
+		20_deploy_containerapp.sh # Two‑phase deploy w/ Managed Identity + AcrPull
+	scripts/                    # Thin wrappers (backward compatibility)
+
+python/
+	README.md
+	samples/
+		quickstart-fastapi/
+			app/main.py
+			requirements.txt
+			Dockerfile              # ARG PYTHON_VERSION=3.10
+
+java/
+	samples/
+		quickstart-springboot/
+			src/main/java/.../DemoApplication.java
+			pom.xml                 # Java 11 target
+			Dockerfile              # ARG JDK_VERSION=11 (multi-stage)
+
+.github/workflows/ (optional CI stub)
 ```
 
-## Prerequisites
-- Azure subscription and `az login`
-- Azure CLI (latest) + `containerapp` extension (handled by `00_prepare.sh`)
-- Bash shell (Linux / WSL / macOS recommended)
+Legacy `samples/quickstart-fastapi` path has been relocated under `python/`; wrapper scripts keep previous command paths working.
 
 ## Runtime Matrix
-Current supported / planned runtimes (build targeting strategy):
 
-| Language | Runtime | Status  | Notes |
+| Language | Version | Status  | Notes |
 |----------|---------|---------|-------|
-| Python   | 3.10    | Active  | Docker ARG `PYTHON_VERSION` (default 3.10) |
-| Java     | 11      | Planned | Will be added with Spring Boot sample |
+| Python   | 3.10    | Active  | `ARG PYTHON_VERSION` in Dockerfile (default 3.10) |
+| Java     | 11      | Active (sample) | `ARG JDK_VERSION` in Dockerfile; minimal API |
 
-When Java sample is introduced, a similar ARG (`JDK_VERSION=11`) pattern will be used to avoid directory duplication.
+Additional languages can reuse the same infra scripts—only the build context and image name differ.
 
-## Quick Start
+## Prerequisites
+* Azure subscription + `az login`
+* Azure CLI (latest) – extension install handled automatically
+* Bash shell (Linux/WSL/macOS)
+* Docker (optional; remote build fallback exists)
 
-### 1. Prepare (Provider & Extension)
+### Dynamic Naming (Optional)
+You can auto-generate unique names with the current date:
+```bash
+source ./infra/shared/name_helpers.sh
+generate_names myproj      # sets RG / ENV / ACR env vars
+echo $RG $ENV $ACR         # inspect
+```
+Then proceed with provisioning using those exported variables.
+
+## Quick Start Overview
+
+Choose one of the flows below.
+
+### A. One‑Shot (Recommended for first trial)
+FastAPI:
+```bash
+./infra/shared/quickstart_deploy.sh --sample fastapi --prefix myproj --location koreacentral
+```
+Spring Boot:
+```bash
+./infra/shared/quickstart_deploy.sh --sample springboot --prefix myproj --location koreacentral
+```
+The script will: install extension, generate names, provision RG/ACR/ACA env, build & push image, then perform two‑phase deploy.
+
+### B. Manual (Explained) – Works for Any Sample
+1) Prepare extension/provider (idempotent):
 ```bash
 ./infra/scripts/00_prepare.sh
 ```
-
-### 2. Provision Infrastructure (Resource Group, ACR, ACA Environment)
+2) Generate (or define) names:
 ```bash
-export RG=my-rg
-export ACR=acraps20141   # must be globally unique
-export ENV=my-env2        # ACA environment name
+source ./infra/shared/name_helpers.sh
+generate_names myproj
 export LOCATION=koreacentral
-
+echo $RG $ENV $ACR
+```
+3) Provision infra:
+```bash
 ./infra/scripts/01_create_infra.sh
 ```
-
-### 3. Build & Push Image
-Use `auto` tag to automatically substitute the current git short SHA:
+4) Build & push image (examples):
 ```bash
+# FastAPI
 ./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-fastapi auto
-# Example output: acraps20141.azurecr.io/quickstart-fastapi:<gitsha>
-```
-Record the full image reference for the next step.
+# OR via helper
+./infra/shared/build_image.sh --acr "$ACR" --sample fastapi --tag auto
 
-### 4. Deploy Container App
+# Spring Boot
+./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-springboot auto
 ```
-./infra/scripts/20_deploy_containerapp.sh <RG> <ENV_NAME> <APP_NAME> <ACR_NAME> <IMAGE> <LOCATION>
-```
-Example:
+5) Deploy (two‑phase placeholder → private image):
 ```bash
-IMAGE="acraps20141.azurecr.io/quickstart-fastapi:abcdef1"  # replace with real sha
-./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" my-app "$ACR" "$IMAGE" "$LOCATION"
+IMAGE="$ACR.azurecr.io/quickstart-fastapi:<sha>"      # or quickstart-springboot
+./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" fastapi-app "$ACR" "$IMAGE" "$LOCATION"
+# For Spring Boot change app name & image:
+IMAGE="$ACR.azurecr.io/quickstart-springboot:<sha>"
+./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" springboot-app "$ACR" "$IMAGE" "$LOCATION"
 ```
-Script flow:
-1. Create app with a public placeholder image (`nginx:latest`) – attempts to attach system identity immediately
-2. Retry assigning system-assigned Managed Identity if not present
+6) Verify:
+```bash
+curl https://fastapi-app.<random>.${LOCATION}.azurecontainerapps.io/health
+curl https://springboot-app.<random>.${LOCATION}.azurecontainerapps.io/
+```
+
+### Local Run (Optional)
+FastAPI:
+```bash
+pip install -r python/samples/quickstart-fastapi/requirements.txt
+uvicorn app.main:app --app-dir python/samples/quickstart-fastapi/app --host 0.0.0.0 --port 8080
+```
+Spring Boot:
+```bash
+(cd java/samples/quickstart-springboot && mvn spring-boot:run)
+```
+
+### Cleanup
+Remove created resources when finished (irreversible):
+```bash
+az group delete -n "$RG" --yes --no-wait
+```
+
+## Deployment Script Flow
+1. Create app with public placeholder image (`nginx:latest`)
+2. Ensure system-assigned identity exists (retry/assign if needed)
 3. Poll for `principalId`
-4. Assign `AcrPull` role and wait for propagation
-5. Update revision to the real ACR image (forces re-pull using MI)
-6. Print final summary (FQDN, image, identity)
+4. Assign `AcrPull` role & wait for role visibility
+5. Patch to real ACR image (forces pull using identity)
+6. Output final status (FQDN, image, identity JSON)
 
-### 5. Verify
+## Script Highlights
+* Local Docker build preferred (faster feedback) with remote ACR build fallback
+* Git SHA auto-tagging for traceability
+* Resilient polling for identity & role assignment propagation
+* Idempotent resource provisioning (safe re-runs)
+
+## Extending
+Add a new language sample under `<language>/samples/<sample-name>` with its Dockerfile. Then call:
 ```bash
-curl https://my-app.<random>.<region>.azurecontainerapps.io/health
+./infra/scripts/10_acr_build_push.sh "$ACR" <image-name> auto
+./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" <app-name> "$ACR" "$ACR.azurecr.io/<image-name>:<sha>" "$LOCATION"
 ```
-
-## Script Details
-
-### 00_prepare.sh
-Installs/updates the `containerapp` extension and registers `Microsoft.App` provider (blocking until ready).
-
-### 01_create_infra.sh
-Requires `RG`, `ACR`, `ENV` (and optional `LOCATION`, default `koreacentral`). Idempotent if resources already exist.
-
-### 10_acr_build_push.sh
-Prefers local Docker build. If build or push fails (or Docker is unavailable), falls back to `az acr build`. Tag `auto` uses git short SHA (falls back to `latest` if git not available).
-
-### 20_deploy_containerapp.sh
-Implements a safe two-phase pattern to avoid timing issues with ACR permissions while Managed Identity and role assignment propagate. Includes retries, polling debug output, and final state summary.
+No infra script changes required.
 
 ## Troubleshooting
 | Symptom | Cause | Resolution |
 |---------|-------|-----------|
-| principalId timeout | Identity propagation delay | Increase `WAIT_PRINCIPAL_TIMEOUT` or rerun after 1–2 minutes |
-| Image pull error | `AcrPull` not yet visible | Rerun deploy script (it will only update image) |
-| ACR auth error | Role/permissions not ready after creation | Wait ~30s then rebuild/push |
-| Environment ScheduledForDelete | Previous delete in progress | Use a new environment name or wait for deletion to finish |
+| principalId timeout | Identity propagation delay | Increase `WAIT_PRINCIPAL_TIMEOUT` or wait and rerun |
+| Image pull error | Role not propagated yet | Rerun deploy (image update only) |
+| ACR auth error | Newly created ACR delay | Wait ~30s then retry push/build |
+| Env ScheduledForDelete | Deletion still pending | Use a new env name |
 
-Adjust timeouts via environment variables:
+Override timeouts:
 ```bash
-export WAIT_PRINCIPAL_TIMEOUT=300   # default 240
-export WAIT_ROLE_TIMEOUT=400        # default 300
+export WAIT_PRINCIPAL_TIMEOUT=300
+export WAIT_ROLE_TIMEOUT=400
 ```
 
 ## GitHub Actions (Optional)
-The initial workflow is present but does not yet include the full placeholder + two‑phase logic. To integrate, run:
-1. `10_acr_build_push.sh`
-2. `20_deploy_containerapp.sh` with the produced image reference
+Current workflow is a stub; integrate by invoking the same shell scripts for consistency. Future enhancement: matrix over images (fastapi, springboot) using shared steps.
+
+## Roadmap
+* Unified multi-image build helper (optional convenience)
+* Add .NET sample
+* GitHub Actions matrix with environment caching and OIDC-based ACR push
+* Application insights / logging enrichment
 
 ## Summary
-This sample demonstrates a reliable pattern for deploying ACR images to Azure Container Apps with Managed Identity and role propagation handling. You can extend it with Bicep/Terraform IaC, Key Vault integration, scaling rules (KEDA), or secrets management as needed.
+This repository demonstrates a repeatable, language-agnostic pattern for safely deploying containerized workloads to Azure Container Apps using Managed Identity + ACR with minimized race conditions.
 
----
-Feel free to request additions (e.g., GitHub Actions enhancements, IaC templates).
+Contributions & requests welcome.

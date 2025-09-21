@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$DIR/shared/01_create_infra.sh" "$@"#!/usr/bin/env bash
 set -euo pipefail
 
 # 01_create_infra.sh
