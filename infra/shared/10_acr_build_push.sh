@@ -39,6 +39,17 @@ fi
 
 echo "==> Building Docker image $FULL_IMAGE from context $BUILD_CONTEXT"
 
+# Preflight: ensure ACR exists unless explicitly skipped
+if [ "${ALLOW_BUILD_WITHOUT_ACR:-0}" != "1" ]; then
+  if ! az acr show -n "$ACR_NAME" >/dev/null 2>&1; then
+    echo "[ERROR] ACR '$ACR_NAME' not found. Create infra first, e.g.:"
+    echo "       RG=<rg> ENV=<env> ACR=$ACR_NAME LOCATION=<location> ./infra/scripts/01_create_infra.sh"
+    echo "   Or manually: az acr create -g <rg> -n $ACR_NAME --sku Basic"
+    echo "   (Set ALLOW_BUILD_WITHOUT_ACR=1 to skip this check and build locally only.)"
+    exit 1
+  fi
+fi
+
 # Prefer local Docker build when the daemon is available and responsive.
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   echo "==> Docker is available. Building image locally..."
