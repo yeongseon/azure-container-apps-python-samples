@@ -38,6 +38,12 @@ java/
 
 Legacy `samples/quickstart-fastapi` path has been relocated under `python/`; wrapper scripts keep previous command paths working.
 
+## Language READMEs
+For focused, language-specific instructions (dynamic naming, build, deploy examples):
+
+* [Python FastAPI README](python/README.md)
+* [Java Spring Boot README](java/README.md)
+
 ## Runtime Matrix
 
 | Language | Version | Status  | Notes |
@@ -54,11 +60,25 @@ Additional languages can reuse the same infra scripts—only the build context a
 * Docker (optional; remote build fallback exists)
 
 ### Dynamic Naming (Optional)
-You can auto-generate unique names with the current date:
+You can auto-generate unique names with the current date.
+
+Source mode:
 ```bash
 source ./infra/shared/name_helpers.sh
-generate_names myproj      # sets RG / ENV / ACR env vars
-echo $RG $ENV $ACR         # inspect
+generate_names myproj   # exports RG / ENV / ACR
+echo $RG $ENV $ACR
+```
+Direct execution modes:
+```bash
+# Shell export lines (use with eval)
+eval $(./infra/shared/name_helpers.sh print myproj)
+echo $RG $ENV $ACR
+
+# JSON output (for scripting)
+./infra/shared/name_helpers.sh json myproj
+
+# Plain names (space separated)
+./infra/shared/name_helpers.sh names myproj
 ```
 Then proceed with provisioning using those exported variables.
 
@@ -102,6 +122,10 @@ echo $RG $ENV $ACR
 
 # Spring Boot
 ./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-springboot auto
+```
+Note: Build script performs an ACR existence preflight. If you want to build a local image before provisioning ACR, set:
+```bash
+ALLOW_BUILD_WITHOUT_ACR=1 ./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-fastapi auto
 ```
 5) Deploy (two‑phase placeholder → private image):
 ```bash

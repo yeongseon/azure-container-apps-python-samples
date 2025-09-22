@@ -2,10 +2,38 @@
 
 Contains Spring Boot quickstart targeting Java 11.
 
-## Build (Example)
+## Build (Recommended Usage)
+Run from repository root. Create infra before building to ensure push works.
+
+1. Generate names & set location:
 ```bash
-ACR_NAME=acrdemo20250921x01
-./infra/scripts/10_acr_build_push.sh "$ACR_NAME" quickstart-springboot auto
+eval $(./infra/shared/name_helpers.sh print springboot)
+export LOCATION=koreacentral
+```
+2. Prepare + create infra:
+```bash
+./infra/scripts/00_prepare.sh
+RG="$RG" ENV="$ENV" ACR="$ACR" LOCATION="$LOCATION" ./infra/scripts/01_create_infra.sh
+```
+3. Build & push image:
+```bash
+./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-springboot auto
+```
+
+Manual naming:
+```bash
+ACR=myprojacr$(date +%Y%m%d)xyz
+RG=myproj-rg-$(date +%Y%m%d)
+ENV=myproj-env-$(date +%Y%m%d)
+LOCATION=koreacentral
+./infra/scripts/00_prepare.sh
+RG="$RG" ENV="$ENV" ACR="$ACR" LOCATION="$LOCATION" ./infra/scripts/01_create_infra.sh
+./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-springboot auto
+```
+
+Note: Build script has an ACR preflight check. To build a local-only image without creating ACR yet:
+```bash
+ALLOW_BUILD_WITHOUT_ACR=1 ./infra/scripts/10_acr_build_push.sh "$ACR" quickstart-springboot auto
 ```
 
 ## Local Run
@@ -14,14 +42,23 @@ ACR_NAME=acrdemo20250921x01
 ```
 
 ## Deploy (Example)
+Dynamic naming path (same shell as build, variables still exported):
 ```bash
-RG=aca-demo-rg-20250921
-ENV=aca-demo-env-20250921
 LOCATION=koreacentral
-ACR_NAME=acrdemo20250921x01
-IMAGE="$ACR_NAME.azurecr.io/quickstart-springboot:<sha>"
 APP=springboot-app
-./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" "$APP" "$ACR_NAME" "$IMAGE" "$LOCATION"
+IMAGE="$ACR.azurecr.io/quickstart-springboot:$(git rev-parse --short HEAD)"
+./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" "$APP" "$ACR" "$IMAGE" "$LOCATION"
+```
+
+Manual naming path:
+```bash
+RG=myproj-rg-$(date +%Y%m%d)
+ENV=myproj-env-$(date +%Y%m%d)
+ACR=myprojacr$(date +%Y%m%d)xyz
+LOCATION=koreacentral
+APP=springboot-app
+IMAGE="$ACR.azurecr.io/quickstart-springboot:$(git rev-parse --short HEAD)"
+./infra/scripts/20_deploy_containerapp.sh "$RG" "$ENV" "$APP" "$ACR" "$IMAGE" "$LOCATION"
 ```
 
 ## Runtime
