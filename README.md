@@ -18,31 +18,33 @@ infra/
 		20_deploy_containerapp.sh # Two‑phase deploy w/ Managed Identity + AcrPull
 	scripts/                    # Thin wrappers (backward compatibility)
 
-python/
-	README.md
-	samples/
-		quickstart-fastapi/
-			app/main.py
-			requirements.txt
-			Dockerfile              # ARG PYTHON_VERSION=3.10
-
-java/
-	samples/
-		quickstart-springboot/
-			src/main/java/.../DemoApplication.java
-			pom.xml                 # Java 11 target
-			Dockerfile              # ARG JDK_VERSION=11 (multi-stage)
+samples/
+	python/
+		README.md
+		samples/
+			quickstart-fastapi/
+				app/main.py
+				requirements.txt
+				Dockerfile              # ARG PYTHON_VERSION=3.10
+	
+	java/
+		README.md
+		samples/
+			quickstart-springboot/
+				src/main/java/.../DemoApplication.java
+				pom.xml                 # Java 11 target
+				Dockerfile              # ARG JDK_VERSION=11 (multi-stage)
 
 .github/workflows/ (optional CI stub)
 ```
 
-Legacy `samples/quickstart-fastapi` path has been relocated under `python/`; wrapper scripts keep previous command paths working.
+The `python/` and `java/` directories are now organized under the `samples/` directory for better project structure.
 
 ## Language READMEs
 For focused, language-specific instructions (dynamic naming, build, deploy examples):
 
-* [Python FastAPI README](python/README.md)
-* [Java Spring Boot README](java/README.md)
+* [Python FastAPI README](samples/python/README.md)
+* [Java Spring Boot README](samples/java/README.md)
 
 ## Runtime Matrix
 
@@ -144,12 +146,12 @@ curl https://springboot-app.<random>.${LOCATION}.azurecontainerapps.io/
 ### Local Run (Optional)
 FastAPI:
 ```bash
-pip install -r python/samples/quickstart-fastapi/requirements.txt
-uvicorn app.main:app --app-dir python/samples/quickstart-fastapi/app --host 0.0.0.0 --port 8080
+pip install -r samples/python/samples/quickstart-fastapi/requirements.txt
+uvicorn app.main:app --app-dir samples/python/samples/quickstart-fastapi/app --host 0.0.0.0 --port 8080
 ```
 Spring Boot:
 ```bash
-(cd java/samples/quickstart-springboot && mvn spring-boot:run)
+(cd samples/java/samples/quickstart-springboot && mvn spring-boot:run)
 ```
 
 ### Cleanup
